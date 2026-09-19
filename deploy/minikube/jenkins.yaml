@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cicd-hook-demo
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-init
+  namespace: cicd-hook-demo
+data:
+  01-security-and-job.groovy: |
+    import hudson.model.FreeStyleProject
+    import hudson.model.ParametersDefinitionProperty
+    import hudson.model.StringParameterDefinition
+    import hudson.security.FullControlOnceLoggedInAuthorizationStrategy
+    import hudson.security.HudsonPrivateSecurityRealm
+    import hudson.tasks.Shell
+    import jenkins.model.Jenkins
+
+    def jenkins = Jenkins.get()
+    def realm = new HudsonPrivateSecurityRealm(false)
+    realm.createAccount("admin", "admin")
+    jenkins.setSecurityRealm(realm)
+
+    def authorization = new FullControlOnceLoggedInAuthorizationStrategy()
+    authorization.setAllowAnonymousRead(false)
+    jenkins.setAuthorizationStrategy(authorization)
+
+    // Local Minikube demo only. It permits admin/admin API calls without a crumb.
+    jenkins.setCrumbIssuer(null)
+
+    def jobName = "cicd-hook-demo"
+    def job = jenkins.getItem(jobName)
+    if (job == null) {
+      job = jenkins.createProject(FreeStyleProject, jobName)
+    }
+    job.removeProperty(ParametersDefinitionProperty)
+    job.addProperty(new ParametersDefinitionProperty([
+      new StringParameterDefinition("HOOK_EVENT_ID", "", "Webhook delivery ID"),
+      new StringParameterDefinition("HOOK_SOURCE", "", "Repository provider"),
+      new StringParameterDefinition("HOOK_BRANCH", "", "Changed branch"),
+      new StringParameterDefinition("HOOK_REVISION", "", "Commit or changelist"),
+      new StringParameterDefinition("HOOK_REPOSITORIES", "", "Changed repositories"),
+      new StringParameterDefinition("ROUTED_BY", "", "Router marker")
+    ]))
+    job.getBuildersList().clear()
+    job.getBuildersList().add(new Shell('''#!/bin/sh
+      set -eu
+      echo "CI/CD hook received"
+      echo "source=${HOOK_SOURCE}"
+      echo "event=${HOOK_EVENT_ID}"
+      echo "repository=${HOOK_REPOSITORIES}"
+      echo "branch=${HOOK_BRANCH}"
+      echo "revision=${HOOK_REVISION}"
+      echo "routed_by=${ROUTED_BY}"
+    '''))
+    job.save()
+    jenkins.save()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: cicd-hook-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      containers:
+        - name: jenkins
+          image: jenkins/jenkins:lts-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: JAVA_OPTS
+              value: -Djenkins.install.runSetupWizard=false
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 30
+          volumeMounts:
+            - name: init
+              mountPath: /usr/share/jenkins/ref/init.groovy.d
+              readOnly: true
+            - name: home
+              mountPath: /var/jenkins_home
+      volumes:
+        - name: init
+          configMap:
+            name: jenkins-init
+        - name: home
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins
+  namespace: cicd-hook-demo
+spec:
+  type: NodePort
+  selector:
+    app: jenkins
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080
+

@@ -1,0 +1,19 @@
+version: 1
+pipelines:
+  - id: github-pr-demo
+    enabled: true
+    match:
+      sources: [github]
+      events: [push]
+      repositories: ["*"]
+      branches: ["*"]
+      include_paths: ["*"]
+    trigger:
+      provider: jenkins
+      base_url: http://127.0.0.1:18080
+      job: cicd-hook-demo
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        ROUTED_BY: minikube-e2e-demo
+
