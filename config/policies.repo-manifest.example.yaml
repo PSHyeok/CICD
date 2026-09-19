@@ -1,0 +1,91 @@
+# Repo manifest 전용 정책 예시
+#
+# 호출 엔드포인트: POST /v1/hooks/repo-manifest
+# sources 값은 엔드포인트의 하이픈 표기와 달리 repo_manifest를 사용합니다.
+# repositories는 요청 payload의 projects[].name과 비교됩니다.
+# 운영 환경에서는 JENKINS_USERNAME, JENKINS_TOKEN, HOOK_SECRET을
+# 환경변수로 주입하세요.
+
+version: 1
+
+pipelines:
+  # platform/frameworks/base의 핵심 소스가 변경된 경우에만 실행합니다.
+  - id: android-framework-build
+    enabled: true
+    match:
+      sources: [repo_manifest]
+      events: [sync]
+      repositories:
+        - "platform/frameworks/base"
+      branches:
+        - main
+        - "release/*"
+      include_paths:
+        - "core/*"
+        - "services/*"
+        - "Android.bp"
+      exclude_paths:
+        - "docs/*"
+        - "**/*.md"
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: android/framework-build
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: framework
+        ROUTED_BY: cicd-hook-router
+
+  # Settings 프로젝트에서는 어떤 파일이든 변경되면 실행합니다.
+  - id: android-settings-build
+    enabled: true
+    match:
+      sources: [repo_manifest]
+      events: [sync]
+      repositories:
+        - "packages/apps/Settings"
+      branches:
+        - main
+      include_paths:
+        - "*"
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: android/settings-build
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: settings
+        ROUTED_BY: cicd-hook-router
+
+  # 여러 프로젝트 중 하나라도 변경되면 전체 통합 빌드를 실행합니다.
+  # 하나의 manifest 이벤트가 위의 프로젝트 정책과 이 정책에 동시에
+  # 매칭되면 Jenkins job도 각각 한 번씩 실행됩니다.
+  - id: android-integration-build
+    enabled: true
+    match:
+      sources: [repo_manifest]
+      events: [sync]
+      repositories:
+        - "platform/*"
+        - "packages/apps/*"
+        - "vendor/company/*"
+      branches:
+        - main
+        - "release/*"
+      include_paths:
+        - "*"
+      exclude_paths:
+        - "docs/*"
+        - "**/*.md"
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: android/integration-build
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: integration
+        ROUTED_BY: cicd-hook-router
+
