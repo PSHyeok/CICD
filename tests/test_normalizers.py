@@ -1,27 +1,17 @@
-from cicd_router.models import ManifestProjectChange, RepoManifestHook
-from cicd_router.normalizers import normalize_repo_manifest
+from cicd_router.models import PerforceHook
+from cicd_router.normalizers import normalize_perforce
 
 
-def test_repo_manifest_preserves_project_path_ownership() -> None:
-    event = normalize_repo_manifest(
-        RepoManifestHook(
-            event_id="evt-7",
-            manifest="default.xml",
+def test_perforce_preserves_depot_path_ownership() -> None:
+    event = normalize_perforce(
+        PerforceHook(
+            changelist=10425,
+            depot="//Game/Main",
             branch="main",
-            revision="abc123",
-            projects=[
-                ManifestProjectChange(
-                    name="platform/core", revision="111", changed_files=["src/a.py"]
-                ),
-                ManifestProjectChange(
-                    name="apps/web", revision="222", changed_files=["web/index.ts"]
-                ),
-            ],
+            changed_files=["Source/Game.cpp", "Content/Hero.uasset"],
         )
     )
+    assert event.event_id == "p4-10425"
     assert event.repository_files == {
-        "platform/core": ["src/a.py"],
-        "apps/web": ["web/index.ts"],
+        "//Game/Main": ["Source/Game.cpp", "Content/Hero.uasset"]
     }
-    assert event.metadata["project_revisions"]["apps/web"] == "222"
-

@@ -24,6 +24,7 @@ async def test_jenkins_nested_job_url(monkeypatch) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/job/team/job/web/buildWithParameters"
         assert request.url.params["HOOK_REVISION"] == "abc123"
+        assert request.url.params["ROUTING_MANIFEST_VERSION"] == "manifest-v1"
         return httpx.Response(201, headers={"Location": "https://jenkins/queue/7"})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
@@ -35,6 +36,6 @@ async def test_jenkins_nested_job_url(monkeypatch) -> None:
                 username_env="JENKINS_TEST_USER",
                 token_env="JENKINS_TEST_TOKEN",
             ),
-            event(),
+            event().model_copy(update={"metadata": {"manifest_version": "manifest-v1"}}),
         )
     assert result.external_url == "https://jenkins/queue/7"

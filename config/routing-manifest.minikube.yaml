@@ -1,0 +1,42 @@
+version: 1
+manifest_version: "minikube-e2e-v2"
+
+routes:
+  # src/ 변경이 있는 main 대상 PR에서 실행합니다.
+  - id: demo-source-pr
+    enabled: true
+    match:
+      sources: [github]
+      events: [pull_request]
+      repositories: ["PSHyeok/cicd-manifest-target-demo"]
+      branches: ["*"]
+      source_branches: ["feature/*"]
+      target_branches: [main]
+      include_paths: ["src/*"]
+      on_paths_unavailable: error
+    trigger:
+      provider: jenkins
+      base_url: http://127.0.0.1:18080
+      job: manifest-source
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: source
+
+  # include_paths가 없으므로 저장소와 대상 브랜치만 맞으면 항상 실행합니다.
+  - id: demo-common-pr
+    enabled: true
+    match:
+      sources: [github]
+      events: [pull_request]
+      repositories: ["PSHyeok/cicd-manifest-target-demo"]
+      branches: ["*"]
+      target_branches: [main]
+    trigger:
+      provider: jenkins
+      base_url: http://127.0.0.1:18080
+      job: manifest-common
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: common

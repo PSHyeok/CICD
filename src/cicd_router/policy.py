@@ -5,6 +5,10 @@ from fnmatch import fnmatchcase
 from .models import NormalizedEvent, PipelinePolicy
 
 
+class PathsUnavailableError(RuntimeError):
+    pass
+
+
 def _any_match(values: list[str], patterns: list[str]) -> bool:
     return any(fnmatchcase(value, pattern) for value in values for pattern in patterns)
 
@@ -24,11 +28,25 @@ def matches(policy: PipelinePolicy, event: NormalizedEvent) -> bool:
         return False
     if not _any_match([event.branch], rule.branches):
         return False
+    if rule.source_branches is not None:
+        if event.source_branch is None or not _any_match(
+            [event.source_branch], rule.source_branches
+        ):
+            return False
+    if rule.target_branches is not None:
+        if event.target_branch is None or not _any_match(
+            [event.target_branch], rule.target_branches
+        ):
+            return False
 
-    # GitHub Compare returns at most 300 files. When the set is incomplete,
-    # triggering an extra build is safer than silently skipping a required one.
     if not event.paths_complete:
-        return True
+        if rule.on_paths_unavailable == "trigger":
+            return True
+        if rule.on_paths_unavailable == "skip":
+            return False
+        raise PathsUnavailableError(
+            f"changed paths are unavailable for policy: {policy.id}"
+        )
 
     relevant_files = [
         path
@@ -36,10 +54,13 @@ def matches(policy: PipelinePolicy, event: NormalizedEvent) -> bool:
         for path in event.repository_files.get(repository, [])
     ]
     if not relevant_files:
-        return rule.include_paths == ["*"] and not rule.exclude_paths
+        # Omitting include_paths means repository/branch matching alone is
+        # sufficient. An explicit path list requires at least one changed file.
+        return rule.include_paths is None
 
+    include_paths = rule.include_paths or ["*"]
     included = [
-        path for path in relevant_files if _any_match([path], rule.include_paths)
+        path for path in relevant_files if _any_match([path], include_paths)
     ]
     return any(
         not _any_match([path], rule.exclude_paths) for path in included

@@ -21,8 +21,8 @@ description: Extend and validate repository source adapters, CI/CD eligibility p
 
 1. Implement `SourceAdapter` under `sources/` and register it in `main.py`; do not leak native
    payload shapes past the normalized event boundary.
-2. Express eligibility in `policy.py` and YAML. Preserve per-repository path
-   ownership for multi-repository events.
+2. Express eligibility in `policy.py` and the versioned routing manifest. Keep
+   the manifest provider (file, SQLite, or HTTP) separate from inbound hooks.
 3. Claim `(source, event_id, policy_id)` before the external request.
 4. Keep Jenkins calls behind `TriggerClient`; read secrets only from named
    environment variables.
@@ -38,6 +38,7 @@ description: Extend and validate repository source adapters, CI/CD eligibility p
 ## Validation
 
 - Run `pytest`.
-- Confirm a path from one repo-manifest project cannot trigger another project.
+- Confirm repository, source branch, target branch, and optional changed-path
+  filters cannot trigger a route belonging to another repository.
 - Confirm a repeated event does not issue a second external request.
 - Treat trigger timeouts as ambiguous; do not blindly retry them.

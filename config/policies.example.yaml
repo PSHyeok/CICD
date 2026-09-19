@@ -3,7 +3,7 @@ pipelines:
   - id: backend-jenkins
     enabled: true
     match:
-      sources: [github, repo_manifest]
+      sources: [github]
       events: [push, sync]
       repositories: ["services/backend", "platform/*"]
       branches: [main, "release/*"]

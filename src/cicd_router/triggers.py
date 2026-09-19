@@ -47,8 +47,14 @@ class HttpTriggerClient(TriggerClient):
             "HOOK_EVENT_ID": event.event_id,
             "HOOK_SOURCE": event.source.value,
             "HOOK_BRANCH": event.branch,
+            "HOOK_SOURCE_BRANCH": event.source_branch or "",
+            "HOOK_TARGET_BRANCH": event.target_branch or "",
             "HOOK_REVISION": event.revision,
             "HOOK_REPOSITORIES": ",".join(event.repositories),
+            "HOOK_PULL_REQUEST": str(event.pull_request_number or ""),
+            "ROUTING_MANIFEST_VERSION": str(
+                event.metadata.get("manifest_version", "")
+            ),
         }
         response = await self.client.post(
             url,

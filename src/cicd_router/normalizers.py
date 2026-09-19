@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import NormalizedEvent, PerforceHook, RepoManifestHook, Source
+from .models import NormalizedEvent, PerforceHook, Source
 
 
 def normalize_perforce(hook: PerforceHook) -> NormalizedEvent:
@@ -15,27 +15,4 @@ def normalize_perforce(hook: PerforceHook) -> NormalizedEvent:
         repository_files={hook.depot: hook.changed_files},
         actor=hook.actor,
         metadata={"changelist": hook.changelist},
-    )
-
-
-def normalize_repo_manifest(hook: RepoManifestHook) -> NormalizedEvent:
-    changed_files = [path for project in hook.projects for path in project.changed_files]
-    return NormalizedEvent(
-        source=Source.REPO_MANIFEST,
-        event_id=hook.event_id,
-        event_name=hook.event_name,
-        repositories=[project.name for project in hook.projects],
-        branch=hook.branch,
-        revision=hook.revision,
-        changed_files=changed_files,
-        repository_files={
-            project.name: project.changed_files for project in hook.projects
-        },
-        actor=hook.actor,
-        metadata={
-            "manifest": hook.manifest,
-            "project_revisions": {
-                project.name: project.revision for project in hook.projects
-            },
-        },
     )

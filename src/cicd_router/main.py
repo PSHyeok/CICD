@@ -8,12 +8,12 @@ import httpx
 from fastapi import FastAPI, Request
 
 from .config import load_config
+from .manifests import build_manifest_provider
 from .models import HookResponse, IgnoredHookResponse
 from .service import RouterService
 from .sources import (
     GitHubSourceAdapter,
     PerforceSourceAdapter,
-    RepoManifestSourceAdapter,
     SourceAdapterRegistry,
 )
 from .store import EventStore
@@ -24,16 +24,17 @@ def _build_runtime() -> tuple[RouterService, SourceAdapterRegistry, httpx.AsyncC
     config_path = os.getenv("CICD_ROUTER_CONFIG", "config/policies.yaml")
     database_path = os.getenv("CICD_ROUTER_DB", "cicd-router.db")
     client = httpx.AsyncClient(timeout=20)
+    config = load_config(config_path)
     service = RouterService(
-        config=load_config(config_path),
+        config=config,
         store=EventStore(database_path),
         trigger_client=HttpTriggerClient(client),
+        manifest_provider=build_manifest_provider(config, client),
     )
     adapters = SourceAdapterRegistry(
         [
             GitHubSourceAdapter(client),
             PerforceSourceAdapter(),
-            RepoManifestSourceAdapter(),
         ]
     )
     return service, adapters, client

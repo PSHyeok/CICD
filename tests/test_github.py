@@ -1,7 +1,7 @@
 import httpx
 
 from cicd_router.github import GitHubApiClient, ZERO_SHA
-from cicd_router.models import GitHubPushHook
+from cicd_router.models import GitHubPullRequestHook, GitHubPushHook
 
 
 def push_hook(**overrides) -> GitHubPushHook:
@@ -70,3 +70,35 @@ async def test_300_compare_files_are_marked_incomplete() -> None:
         event = await GitHubApiClient(http).normalize(push_hook(), "delivery-3")
 
     assert event.paths_complete is False
+
+
+async def test_pull_request_uses_files_api_and_branch_roles() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/repos/acme/api/pulls/17/files"
+        assert request.url.params["per_page"] == "100"
+        return httpx.Response(
+            200,
+            json=[{"filename": "backend/api.py"}, {"filename": "docs/readme.md"}],
+        )
+
+    hook = GitHubPullRequestHook.model_validate(
+        {
+            "action": "opened",
+            "number": 17,
+            "repository": {"full_name": "acme/api"},
+            "sender": {"login": "alice"},
+            "pull_request": {
+                "head": {"ref": "feature/login", "sha": "head-sha"},
+                "base": {"ref": "main", "sha": "base-sha"},
+            },
+        }
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        event = await GitHubApiClient(http).normalize_pull_request(hook, "delivery-pr")
+
+    assert event.event_name == "pull_request"
+    assert event.source_branch == "feature/login"
+    assert event.target_branch == "main"
+    assert event.branch == "main"
+    assert event.pull_request_number == 17
+    assert event.changed_files == ["backend/api.py", "docs/readme.md"]

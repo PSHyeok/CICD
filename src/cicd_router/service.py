@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .manifests import ManifestProvider, StaticManifestProvider
 from .models import HookResponse, NormalizedEvent, RouterConfig, TriggerResult
 from .policy import matching_policies
 from .store import EventStore
@@ -8,15 +9,31 @@ from .triggers import TriggerClient
 
 class RouterService:
     def __init__(
-        self, config: RouterConfig, store: EventStore, trigger_client: TriggerClient
+        self,
+        config: RouterConfig,
+        store: EventStore,
+        trigger_client: TriggerClient,
+        manifest_provider: ManifestProvider | None = None,
     ) -> None:
         self.config = config
         self.store = store
         self.trigger_client = trigger_client
+        self.manifest_provider = manifest_provider or StaticManifestProvider(
+            config.pipelines
+        )
 
     async def route(self, event: NormalizedEvent) -> HookResponse:
-        policies = matching_policies(self.config.pipelines, event)
+        manifest = await self.manifest_provider.load()
+        policies = matching_policies(manifest.routes, event)
         results: list[TriggerResult] = []
+        trigger_event = event.model_copy(
+            update={
+                "metadata": {
+                    **event.metadata,
+                    "manifest_version": manifest.version,
+                }
+            }
+        )
 
         for policy in policies:
             claimed = self.store.claim(event.source.value, event.event_id, policy.id)
@@ -33,7 +50,7 @@ class RouterService:
 
             try:
                 result = await self.trigger_client.trigger(
-                    policy.id, policy.trigger, event
+                    policy.id, policy.trigger, trigger_event
                 )
             except Exception as exc:
                 detail = f"{type(exc).__name__}: {exc}"
@@ -66,7 +83,7 @@ class RouterService:
 
         return HookResponse(
             event_id=event.event_id,
+            manifest_version=manifest.version,
             matched_policies=[policy.id for policy in policies],
             results=results,
         )
-

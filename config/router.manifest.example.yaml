@@ -1,0 +1,8 @@
+# Router 런타임 설정입니다. 실제 라우팅 규칙은 manifest_source에서 읽습니다.
+version: 1
+
+manifest_source:
+  # file 대신 sqlite 또는 http provider를 선택할 수 있습니다.
+  provider: file
+  path: config/routing-manifest.example.yaml
+

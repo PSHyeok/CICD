@@ -14,6 +14,9 @@ dependencies = [
   "uvicorn[standard]>=0.30,<1",
 ]
 
+[project.scripts]
+cicd-manifest = "cicd_router.manifest_admin:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3,<9",
