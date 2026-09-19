@@ -1,0 +1,6 @@
+version: 1
+
+manifest_source:
+  provider: sqlite
+  path: routing-manifest.db
+

@@ -1,0 +1,4 @@
+version: 1
+manifest_source:
+  provider: file
+  path: config/routing-manifest.minikube.yaml

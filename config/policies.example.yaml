@@ -1,0 +1,36 @@
+version: 1
+pipelines:
+  - id: backend-jenkins
+    enabled: true
+    match:
+      sources: [github]
+      events: [push, sync]
+      repositories: ["services/backend", "platform/*"]
+      branches: [main, "release/*"]
+      include_paths: ["src/*", "pyproject.toml", "Dockerfile"]
+      exclude_paths: ["docs/*"]
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: services/backend
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        ROUTED_BY: cicd-hook-router
+
+  - id: game-build-jenkins
+    enabled: true
+    match:
+      sources: [perforce]
+      events: [submit]
+      repositories: ["//Game/Main"]
+      branches: [main]
+      include_paths: ["Source/*", "Content/*"]
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: game/main-build
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        ROUTED_BY: cicd-hook-router

@@ -1,0 +1,9 @@
+version: 1
+
+manifest_source:
+  provider: http
+  # GitHub Contents API에 저장된 private manifest도 raw media type으로 읽습니다.
+  url: https://api.github.com/repos/OWNER/MANIFEST_REPO/contents/routing-manifest.yaml?ref=main
+  token_env: GITHUB_TOKEN
+  use_cached_on_error: true
+

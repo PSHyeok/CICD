@@ -1,0 +1,87 @@
+# CI/CD 라우팅 manifest 예시
+# 이 파일은 GitHub webhook 자체가 아니라 저장소/브랜치/경로와
+# Jenkins job 사이의 연결 규칙을 정의합니다.
+
+version: 1
+manifest_version: "2026-09-19.1"
+
+routes:
+  # backend 경로가 변경된 PR에서만 실행합니다.
+  - id: platform-backend-pr
+    enabled: true
+    match:
+      sources: [github]
+      events: [pull_request]
+      repositories: ["PSHyeok/platform"]
+      branches: ["*"]
+      source_branches: ["feature/*", "fix/*"]
+      target_branches: [main, "release/*"]
+      include_paths:
+        - "backend/*"
+        - "shared/*"
+      exclude_paths:
+        - "backend/docs/*"
+        - "**/*.md"
+      on_paths_unavailable: trigger
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: platform/backend-pr
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: backend
+
+  # frontend 경로가 변경된 PR에서만 실행합니다.
+  - id: platform-frontend-pr
+    enabled: true
+    match:
+      sources: [github]
+      events: [pull_request]
+      repositories: ["PSHyeok/platform"]
+      branches: ["*"]
+      target_branches: [main, "release/*"]
+      include_paths:
+        - "frontend/*"
+        - "shared/*"
+      on_paths_unavailable: trigger
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: platform/frontend-pr
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+      parameters:
+        BUILD_TARGET: frontend
+
+  # include_paths를 생략했으므로 모든 PR에서 실행합니다.
+  - id: platform-common-validation
+    enabled: true
+    match:
+      sources: [github]
+      events: [pull_request]
+      repositories: ["PSHyeok/platform"]
+      branches: ["*"]
+      target_branches: [main, "release/*"]
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: platform/common-validation
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+
+  # 일반 push도 별도 route로 정의할 수 있습니다.
+  - id: platform-main-push
+    enabled: true
+    match:
+      sources: [github]
+      events: [push]
+      repositories: ["PSHyeok/platform"]
+      branches: [main]
+    trigger:
+      provider: jenkins
+      base_url: https://jenkins.example.com
+      job: platform/main-build
+      username_env: JENKINS_USERNAME
+      token_env: JENKINS_TOKEN
+
